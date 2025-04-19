@@ -19,6 +19,8 @@ app = FastAPI()
 
 @app.post("/ingest")
 async def ingest(file: UploadFile = File(...)):
+    print('ingest endpoint called, file:', file.filename)
+
     temp_path = os.path.join(chatbot_temp_dir, file.filename)
     
     with open(temp_path, "wb") as buffer:
@@ -51,6 +53,8 @@ class QueryRequest(BaseModel):
 
 @app.post("/query")
 async def query(request: QueryRequest):
+    print('query endpoint called, question:', request.question)
+
     try:
         result = query_pinecone(request.question)
         return JSONResponse(content=result)
