@@ -1,38 +1,33 @@
 
+from llama_index.vector_stores.pinecone import PineconeVectorStore
+from llama_index.core.storage import StorageContext
+from llama_index.core import VectorStoreIndex
+from llama_index.core.schema import TextNode
 import os
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Pinecone
-from langchain.schema.document import Document
-import pinecone
 
-index_name = "chatbot-pdf"
-
-# Initialize Pinecone client
-def init_pinecone():
-    pinecone_api_key = os.getenv("PINECONE_API_KEY")
-    pinecone_env = os.getenv("PINECONE_ENVIRONMENT")
-
-    pinecone.init(api_key=pinecone_api_key, environment=pinecone_env)
-
-    if index_name not in pinecone.list_indexes():
-        pinecone.create_index(name=index_name, dimension=1536)  # adjust based on model
-
-    return pinecone.Index(index_name)
+pinecone_index_name = os.getenv("PINECONE_INDEX_NAME")
 
 # Embed and store chunks in Pinecone
 def embed_chunks_to_pinecone(chunks):
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=os.getenv("OPENAI_API_KEY"))
+    pinecone_api_key = os.getenv("PINECONE_API_KEY")
+    pinecone_env = os.getenv("PINECONE_ENVIRONMENT")
 
-    documents = [
-        Document(
-            page_content=chunk["chunk"],
+    nodes = [
+        TextNode(
+            text=chunk["chunk"],
             metadata={"pages": chunk["pages"]}
         )
         for chunk in chunks
     ]
 
-    init_pinecone()
+    vector_store = PineconeVectorStore(
+        index_name=pinecone_index_name,
+        api_key=pinecone_api_key,
+        environment=pinecone_env
+    )
 
-    Pinecone.from_documents(documents, embedding=embeddings, index_name=index_name)
+    # Create index
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    index = VectorStoreIndex(nodes, storage_context=storage_context)
 
-    return {"status": "stored", "count": len(documents)}
+    return {"status": "stored", "count": len(chunks)}
