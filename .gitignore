@@ -1,0 +1,40 @@
+# Environment variables
+.env
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+
+# IDE specific files
+.vscode/
+.idea/
+
+# Log files
+*.log
+
+# Local development files
+local.settings.json
+
+# Dependency directories
+node_modules/
+
+# Build directories
+build/
+dist/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db 
