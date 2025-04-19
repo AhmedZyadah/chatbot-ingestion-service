@@ -1,31 +1,58 @@
 import os
-from langchain_community.vectorstores import Pinecone
-from langchain_openai import OpenAIEmbeddings
-from langchain_openai import ChatOpenAI
-from langchain.chains import RetrievalQA
+import logging
+from typing import Dict, List, Optional
+from llama_index.vector_stores.pinecone import PineconeVectorStore
+from llama_index.core.storage import StorageContext
+from llama_index.core import VectorStoreIndex
+from llama_index.core.schema import TextNode
 
-def query_pinecone(question: str):
-    # 1. تهيئة Embeddings
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    # 2. استدعاء الـ index الموجود
-    pinecone_index_name = os.getenv("PINECONE_INDEX_NAME")
-    vectorstore = Pinecone.from_existing_index(index_name=pinecone_index_name, embedding=embeddings)
+def query_pinecone(question: str) -> Dict[str, Optional[str | List[Dict]]]:
+    """
+    Query Pinecone with a question and return the answer along with source documents.
 
-    # 3. إعداد LLM
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+    Args:
+        question (str): The question to query.
 
-    # 4. ربط الاسترجاع بالـ LLM (RAG)
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=vectorstore.as_retriever(),
-        return_source_documents=True
-    )
+    Returns:
+        Dict[str, Optional[str | List[Dict]]]: A dictionary containing the answer and sources.
+    """
 
-    # 5. إرسال السؤال
-    result = qa_chain({"query": question})
+    try:
+        # 1. Check environment variables
+        pinecone_api_key = os.getenv("PINECONE_API_KEY")
+        pinecone_env = os.getenv("PINECONE_ENVIRONMENT")
+        pinecone_index_name = os.getenv("PINECONE_INDEX_NAME")
+        
+        if not all([pinecone_api_key, pinecone_env, pinecone_index_name]):
+            raise ValueError("Missing required Pinecone environment variables")
 
-    return {
-        "answer": result["result"],
-        "sources": [doc.metadata for doc in result["source_documents"]]
-    }
+        # 2. Initialize Pinecone vector store
+        vector_store = PineconeVectorStore(
+            index_name=pinecone_index_name,
+            api_key=pinecone_api_key,
+            environment=pinecone_env
+        )
+
+        # 3. Load the index
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+
+        # 4. Query the index
+        query_engine = index.as_query_engine()
+        response = query_engine.query(question)
+
+        return {
+            "answer": str(response),
+            "sources": [dict(node.metadata) for node in response.source_nodes]
+        }
+
+    except Exception as e:
+        logger.error(f"An error occurred while querying Pinecone: {e}")
+        return {
+            "answer": None,
+            "sources": None
+        }
